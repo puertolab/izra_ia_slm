@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistente de Extensiones Telefónicas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f1f1f1;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            border: 2px solid #c00;
+        }
+        h1 {
+            font-size: 24px;
+            color: #c00;
+            text-align: center;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header img {
+            width: 100px;
+            height: auto;
+        }
+        .chat-window {
+            background-color: #f9f9f9;
+            border-radius: 10px;
+            padding: 10px;
+            border: 1px solid #cccccc;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        .input-area {
+            display: flex;
+            flex-direction: column;
+        }
+        input[type="text"] {
+            padding: 10px;
+            border-radius: 15px;
+            border: 1px solid #c00;
+            margin-bottom: 10px;
+            background-color: #ffffff;
+            color: #333;
+        }
+        input[type="text"]:focus {
+            border: 1px solid #f1c40f;
+        }
+        button {
+            padding: 10px;
+            background-color: #c00;
+            color: white;
+            border-radius: 15px;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #9b0000;
+        }
+        button:active {
+            background-color: #7a0000;
+        }
+        .motivational-phrase {
+            font-style: italic;
+            margin-bottom: 10px;
+            color: #f1c40f;
+            text-align: center;
+        }
+        .error {
+            color: #e74c3c;
+        }
+        .response {
+            color: #333;
+        }
+        .chat-window p {
+            font-size: 16px;
+        }
+        .chat-window strong {
+            color: #c00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Cabecera con el escudo del Ayuntamiento de Puertollano -->
+        <div class="header">
+            <img src="{{ url_for('static', filename='escudo.png') }}" alt="Escudo de Puertollano">
+        </div>
+        <h1>Asistente de Extensiones Telefónicas</h1>
+        <p class="motivational-phrase">{{ motivational_phrase }}</p>
+        
+        <!-- Chat window -->
+        <div class="chat-window" id="chatWindow">
+            <p><strong>Asistente:</strong> ¿Cómo puedo ayudarte?</p>
+        </div>
+
+        <!-- Input area -->
+        <div class="input-area">
+            <input type="text" id="searchInput" placeholder="Ingresa un nombre, departamento o palabra clave">
+            <button id="searchButton">Buscar</button>
+        </div>
+        
+        <!-- Results area -->
+        <div id="result" class="response"></div>
+    </div>
+
+    <script>
+        let timeout;
+
+        function startTimeout() {
+            clearTimeout(timeout);
+            timeout = setTimeout(function () {
+                document.getElementById('chatWindow').innerHTML = '<p><strong>Asistente:</strong> ¿En qué más puedo ayudarte?</p>';
+                document.getElementById('result').innerHTML = '';
+                document.getElementById('searchInput').value = '';
+            }, 40000);
+        }
+
+        document.getElementById('searchInput').addEventListener('keypress', function (event) {
+            if (event.key === 'Enter') {
+                handleSearch();
+            }
+        });
+
+        document.getElementById('searchButton').addEventListener('click', function () {
+            handleSearch();
+        });
+
+        function handleSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            const chatWindow = document.getElementById('chatWindow');
+            const resultDiv = document.getElementById('result');
+
+            resultDiv.innerHTML = '';
+
+            if (!query) {
+                resultDiv.innerHTML = '<p class="error">Por favor, ingresa un término de búsqueda.</p>';
+                return;
+            }
+
+            chatWindow.innerHTML = `<p><strong>Tú:</strong> ${query}</p>`;
+
+            const buscarEnManuales = /(manual|guía|instrucción|formato|procedimiento)/i.test(query);
+            const buscarEnFaq = /(pregunta|faq|ayuda|soporte)/i.test(query);
+
+            if (buscarEnManuales) {
+                fetch('/buscar_manual', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        resultDiv.innerHTML = `<p class="error">${data.error}</p>`;
+                    } else if (data.message) {
+                        resultDiv.innerHTML = `<p>${data.message}</p>`;
+                    } else {
+                        const manualesHtml = data.map(item =>
+                            `<p><a href="${item.ruta}" target="_blank">${item.archivo}</a></p>`
+                        ).join('');
+                        resultDiv.innerHTML = `<p><strong>Manuales encontrados:</strong></p>` + manualesHtml;
+                    }
+                    document.getElementById('searchInput').value = '';
+                    startTimeout();
+                })
+                .catch(err => {
+                    resultDiv.innerHTML = `<p class="error">Error: ${err.message}</p>`;
+                });
+            } else if (buscarEnFaq) {
+                fetch('/buscar_faq', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query })
+                })
+                .then(response => {
+    if (!response.ok) {
+        throw new Error('No se pudo obtener la información del servidor.');
+    }
+    return response.json();
+})
+                .then(data => {
+                    if (data.error) {
+                        resultDiv.innerHTML = `<p class="error">${data.error}</p>`;
+                    } else if (data.message) {
+                        resultDiv.innerHTML = `<p>${data.message}</p>`;
+                    } else {
+                        const faqHtml = data.map(item =>
+                            `<p><strong>${item.Pregunta}:</strong> ${item.respuesta}</p>`
+                        ).join('');
+                        resultDiv.innerHTML = `<p><strong>Preguntas frecuentes encontradas:</strong></p>` + faqHtml;
+                    }
+                    document.getElementById('searchInput').value = '';
+                    startTimeout();
+                })
+                .catch(err => {
+                    resultDiv.innerHTML = `<p class="error">Error: ${err.message}</p>`;
+                });
+            } else {
+                fetch('/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        resultDiv.innerHTML = `<p class="error">${data.error}</p>`;
+                    } else if (data.message) {
+                        resultDiv.innerHTML = `<p>${data.message}</p>`;
+                    } else {
+                        const resultsHtml = data.map(item =>
+                            `<p>${item.Nombre} - ${item.Departamento}: ${item.Extension}</p>`
+                        ).join('');
+                        resultDiv.innerHTML = resultsHtml;
+                    }
+                    document.getElementById('searchInput').value = '';
+                    startTimeout();
+                })
+                .catch(err => {
+                    resultDiv.innerHTML = `<p class="error">Error: ${err.message}</p>`;
+                });
+            }
+        }
+
+        startTimeout();
+    </script>
+</body>
+</html>
